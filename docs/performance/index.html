@@ -1,0 +1,103 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><title>Hash Benchmark for mruby</title><link rel="stylesheet" href="/css/main.css"><link rel="stylesheet" href="/css/uPlot.min.css"><script src="/js/uPlot.iife.min.js"></script><script src="/js/chart.js"></script></head><body><header><h1><a href="/">Hash Benchmark for mruby</a></h1><div><a href="https://github.com/shuujii/mruby-hash-benchmark">GitHub</a></div></header><nav id="toc"><ul><li><a href="/" class="h2">Environment</a><ul><li><a href="/#benchmark-code" class="h3">Benchmark Code</a></li><li><a href="/#implementation" class="h3">Implementation</a></li><li><a href="/#platform" class="h3">Platform</a><ul><li><a href="/#os" class="h4">OS</a></li><li><a href="/#hardware" class="h4">Hardware</a></li></ul></li><li><a href="/#compiler" class="h3">Compiler</a></li><li><a href="/#type-size" class="h3">Type Size</a></li></ul></li><li><a href="/points-of-improvement" class="h2">Points of Improvement</a></li><li><a href="/memory-usage" class="h2">Memory Usage</a></li><li class="active"><a href="#performance" class="h2">Performance</a><ul><li><a href="#basic-operations" class="h3">Basic Operations</a><ul><li><a href="#mrb_hash_set" class="h4"><code>mrb_hash_set</code></a></li><li><a href="#mrb_hash_get" class="h4"><code>mrb_hash_get</code></a></li><li><a href="#mrb_hash_foreach" class="h4"><code>mrb_hash_foreach</code></a></li></ul></li><li><a href="#other-operations" class="h3">Other Operations</a><ul><li><a href="#hash-set" class="h4"><code>Hash#[]=</code></a></li><li><a href="#hash-get" class="h4"><code>Hash#[]</code></a></li><li><a href="#hash-each" class="h4"><code>Hash#each</code></a></li><li><a href="#hash-delete" class="h4"><code>Hash#delete</code></a></li><li><a href="#hash-shift" class="h4"><code>Hash#shift</code></a></li><li><a href="#hash-dup" class="h4"><code>Hash#dup</code></a></li></ul></li></ul></li><li><a href="/binary-size" class="h2">Binary Size</a></li></ul></nav><article id="content">
+<h2 id="performance">Performance</h2>
+
+<p>性能については、基本的には次のような傾向あります。</p>
+
+<ul>
+<li>エントリーリストの実装が、Baseline 実装はセグメントリストで New 実装はフラット配列であるため、反復はオーバーヘッドが小さいぶん New 実装のほうがやや速い。</li>
+<li>ハッシュテーブルなしの場合における挿入/参照の性能は反復性能に依存するが、挿入/参照そのものの処理があるぶん性能差がほぼなくなることもある。</li>
+<li>ハッシュバケットの実装が、New 実装はビットセットであるため、挿入/参照はオーバーヘッドが大きいぶん New 実装のほうが遅い。</li>
+<li>Ruby メソッドの呼び出しは同機能の C API の呼び出しよりもオーバーヘッドが大きいきいため遅い。これは、Rubyメソッドのほうが C API よりも性能差が小さくなるということでもある。</li>
+</ul>
+
+<p>機能や計測条件によっては別な傾向を示す場合があります。それらは以降で考察します。</p>
+
+<p>なお、今回は改造による性能差をより適切に計測できるよう、改造部分以外のオーバーヘッドを小さくするために <code>Hash</code> のキーはすべて整数を使用しています。しかし、現実には整数キーを使用することは少なく、シンボルキーか文字列キーを使うことが多いと思います。シンボルキーの場合はおそらく同程度の性能差になると思いますが、文字列キーの場合はハッシュ値計算等のオーバーヘッドが大きくなるため、性能差はより小さくなります。</p>
+
+<h3 id="basic-operations">Basic Operations</h3>
+
+<p>改造による性能差をより適切に計測するために、挿入/参照/反復の基本操作は C API を直接呼び出して性能を計測します。</p>
+
+<h4 id="mrb_hash_set"><code>mrb_hash_set</code></h4>
+
+<p>空の <code>Hash</code> に <em>N</em> 個のエントリーを <code>mrb_hash_set</code> で挿入した際の、1回あたりの時間 (上図) と総時間 (下図) の計測結果です。</p>
+<div id="chart-performance-c-set" class="line-chart"><div class="modes"><div data-mode="64-word" class="mode">64-bit Word-boxing</div><div data-mode="64-nan" class="mode">64-bit NaN-boxing</div><div data-mode="64-no" class="mode">64-bit No-boxing</div><div data-mode="32-word" class="mode">32-bit Word-boxing</div><div data-mode="32-no" class="mode">32-bit No-boxing</div></div><div class="chart-item"><div class="chart"></div><div class="legend"><div class="legend-header">Hash Size: --</div><div class="legend-body"><div class="legend-items"><div class="legend-item baseline"><div class="legend-figure"></div><div class="legend-label">Baseline:</div><div class="legend-value">--</div><div class="legend-unit">M i/s</div><div class="legend-expansions"><div class="el off"></div><div class="hb off"></div></div></div><div class="legend-item new"><div class="legend-figure"></div><div class="legend-label">New:</div><div class="legend-value">--</div><div class="legend-unit">M i/s</div><div class="legend-expansions"><div class="el off"></div><div class="hb off"></div></div></div><div class="legend-item factor"><div class="legend-figure"><div class="area up"></div><div class="area down"></div></div><div class="legend-label">Factor:</div><div class="legend-value">--</div><div class="legend-unit">times</div></div></div><div class="legend-items"><div class="legend-item expansion-el"><div class="legend-figure"></div><div class="legend-label">Entry List Expansion</div></div><div class="legend-item expansion-hb"><div class="legend-figure"></div><div class="legend-label">Hash Buckets Expansion</div></div></div><div class="legend-notes"><div>Drag and drop to zoom in (double-click resets)</div></div></div></div></div><div class="chart-item"><div class="chart"></div><div class="legend"><div class="legend-header">Hash Size: --</div><div class="legend-body"><div class="legend-items"><div class="legend-item baseline"><div class="legend-figure"></div><div class="legend-label">Baseline:</div><div class="legend-value">--</div><div class="legend-unit">M i/s</div><div class="legend-expansions"><div class="el off"></div><div class="hb off"></div></div></div><div class="legend-item new"><div class="legend-figure"></div><div class="legend-label">New:</div><div class="legend-value">--</div><div class="legend-unit">M i/s</div><div class="legend-expansions"><div class="el off"></div><div class="hb off"></div></div></div><div class="legend-item factor"><div class="legend-figure"><div class="area up"></div><div class="area down"></div></div><div class="legend-label">Factor:</div><div class="legend-value">--</div><div class="legend-unit">times</div></div></div><div class="legend-items"><div class="legend-item expansion-el"><div class="legend-figure"></div><div class="legend-label">Entry List Expansion</div></div><div class="legend-item expansion-hb"><div class="legend-figure"></div><div class="legend-label">Hash Buckets Expansion</div></div></div><div class="legend-notes"><div>Drag and drop to zoom in (double-click resets)</div></div></div></div></div></div>
+<h5>64-bit CPU</h5>
+
+<p>1回あたりの時間は、エントリーリストの拡大時を除くと、(ややばらつきがあるものの) ハッシュテーブルなしの場合は両実装とも概ね同等の性能です。ハッシュテーブルありの場合は <code>Hash</code> サイズが50前後までは New 実装のほうが遅く基本傾向の通りですが、<code>Hash</code> サイズが大きくなると New 実装のほうが速くなっています。挿入の場合はハッシュバケットの探索範囲が広い (同一ハッシュ値のスロットを必ずすべて探索する) ため、ハッシュバケットが小さい New 実装はキャッシュに載りやすくヒット率が高いためだと考えています。</p>
+
+<p>エントリーリストの拡大時は、一貫して New 実装がかなり遅いです。エントリーリストの拡大は Baseline 実装は新しいセグメントを <code>malloc</code> で追加し、New 実装は全体を <code>realloc</code> で拡大するという違いがあり、<code>malloc</code> より <code>realloc</code> が高コストなのだと考えています。</p>
+
+<p>総時間は、エントリーリストの拡大時の遅さが原因で <code>Hash</code> サイズが小さいうちは New 実装が遅いですが、1回あたりの時間が速くなりだすと差が詰まり <code>Hash</code> サイズが100前後で逆転しています。</p>
+
+<h5>32-bit CPU</h5>
+
+<p>32-bit CPU の場合は、1回あたりの時間が New 実装のほうが明確に速くなるということはないようで、<code>Hash</code> サイズ100あたりからばらつきながら両実装が同等の性能になっているようです。これは、32-bit CPU の場合はポインターサイズが4バイトであるため、Baseline 実装でもハッシュバケットのスロットサイズが大きくなくキャッシュに載りやすいためではないかと考えています (これは 64-bit CPU より i/s が大きいこととも整合性があります)。</p>
+
+<p>そのため、総時間は逆転には至らず、0.85倍程度で収束しています。</p>
+
+<h4 id="mrb_hash_get"><code>mrb_hash_get</code></h4>
+
+<p>サイズが <em>N</em> の <code>Hash</code> に対してすべてのキーと1個の存在しないキーを <code>mrb_hash_get</code> で参照した際の、1回あたりの平均時間の計測結果です。</p>
+<div id="chart-performance-c-get" class="line-chart"><div class="modes"><div data-mode="64-word" class="mode">64-bit Word-boxing</div><div data-mode="64-nan" class="mode">64-bit NaN-boxing</div><div data-mode="64-no" class="mode">64-bit No-boxing</div><div data-mode="32-word" class="mode">32-bit Word-boxing</div><div data-mode="32-no" class="mode">32-bit No-boxing</div></div><div class="chart-item"><div class="chart"></div><div class="legend"><div class="legend-header">Hash Size: --</div><div class="legend-body"><div class="legend-items"><div class="legend-item baseline"><div class="legend-figure"></div><div class="legend-label">Baseline:</div><div class="legend-value">--</div><div class="legend-unit">M i/s</div></div><div class="legend-item new"><div class="legend-figure"></div><div class="legend-label">New:</div><div class="legend-value">--</div><div class="legend-unit">M i/s</div></div><div class="legend-item factor"><div class="legend-figure"><div class="area up"></div><div class="area down"></div></div><div class="legend-label">Factor:</div><div class="legend-value">--</div><div class="legend-unit">times</div></div></div><div class="legend-notes"><div>Drag and drop to zoom in (double-click resets)</div></div></div></div></div></div>
+<p>ハッシュテーブルなしの場合は両実装ともほぼ同等の性能で、ハッシュテーブルありの場合は0.7倍から0.8倍程度になっており、基本傾向の通りです。</p>
+
+<h4 id="mrb_hash_foreach"><code>mrb_hash_foreach</code></h4>
+
+<p>サイズが <em>N</em> の <code>Hash</code> に対して全エントリーを <code>mrb_hash_foreach</code> で反復した時間の計測結果です。</p>
+<div id="chart-performance-c-each" class="line-chart"><div class="modes"><div data-mode="64-word" class="mode">64-bit Word-boxing</div><div data-mode="64-nan" class="mode">64-bit NaN-boxing</div><div data-mode="64-no" class="mode">64-bit No-boxing</div><div data-mode="32-word" class="mode">32-bit Word-boxing</div><div data-mode="32-no" class="mode">32-bit No-boxing</div></div><div class="chart-item"><div class="chart"></div><div class="legend"><div class="legend-header">Hash Size: --</div><div class="legend-body"><div class="legend-items"><div class="legend-item baseline"><div class="legend-figure"></div><div class="legend-label">Baseline:</div><div class="legend-value">--</div><div class="legend-unit">M i/s</div></div><div class="legend-item new"><div class="legend-figure"></div><div class="legend-label">New:</div><div class="legend-value">--</div><div class="legend-unit">M i/s</div></div><div class="legend-item factor"><div class="legend-figure"><div class="area up"></div><div class="area down"></div></div><div class="legend-label">Factor:</div><div class="legend-value">--</div><div class="legend-unit">times</div></div></div><div class="legend-notes"><div>Drag and drop to zoom in (double-click resets)</div></div></div></div></div></div>
+<p>64-bit CPU では New 実装が1.3倍程度には速くなっています。32-bit CPU でも概ねやや速くなっています。ただし、No-boxing では特に <code>Hash</code> サイズが40から100あたりで明確に遅くなっている部分も見られ、この原因は不明です。別な環境での追試ではこのように明確に遅くなる傾向は見られなかったため、計測環境に依存する傾向だと考えていますが、直接的な原因は分かっていません。</p>
+
+<h3 id="other-operations">Other Operations</h3>
+
+<p>基本操作以外は Ruby メソッドの呼び出しにより性能を計測します (基本操作に対応する Ruby メソッドも含みます)。</p>
+
+<h4 id="hash-set"><code>Hash#[]=</code></h4>
+
+<p>空の <code>Hash</code> に <em>N</em> 個のエントリーを <code>Hash#[]=</code> で挿入した時間の計測結果です。</p>
+<div id="chart-performance-ruby-set" class="bar-chart"><div class="modes"><div data-mode="64-word" class="mode">64-bit Word-boxing</div><div data-mode="64-nan" class="mode">64-bit NaN-boxing</div><div data-mode="64-no" class="mode">64-bit No-boxing</div><div data-mode="32-word" class="mode">32-bit Word-boxing</div><div data-mode="32-no" class="mode">32-bit No-boxing</div></div><div class="chart-item"><div class="chart"></div><div class="legend"><div class="legend-body"><div class="legend-items"><div class="legend-item baseline"><div class="legend-figure"></div><div class="legend-label">Baseline</div></div><div class="legend-item new"><div class="legend-figure"></div><div class="legend-label">New</div></div><div class="legend-item factor"><div class="legend-figure"><div class="text up"></div><div class="text down"></div></div><div class="legend-label">Factor</div></div></div></div></div></div></div>
+<p>ハッシュテーブルなしの場合は概ね両実装とも同等の性能です。ハッシュテーブルありの場合は New 実装のほうが遅く <code>Hash</code> サイズが大きくなるにつれ差が広がっています。対応する C API の <code>mrb_hash_set</code> では <code>Hash</code> サイズが大きくなると性能差が収束し、64-bit CPU では逆転していましたがそのような傾向はみられません。これは、Ruby メソッドの呼び出し時は様々なメモリーアドレスにアクセスするため、ハッシュバケットがキャッシュに載りに続け難くなり、New 実装になって計算量が増えたことがそのまま性能低下に反映されていると考えています。</p>
+
+<h4 id="hash-get"><code>Hash#[]</code></h4>
+
+<p>サイズが <em>N</em> の <code>Hash</code> に対してすべてのキーと1個の存在しないキーを <code>Hash#[]</code> で参照した際の、1回あたりの平均時間の計測結果です。</p>
+<div id="chart-performance-ruby-get" class="bar-chart"><div class="modes"><div data-mode="64-word" class="mode">64-bit Word-boxing</div><div data-mode="64-nan" class="mode">64-bit NaN-boxing</div><div data-mode="64-no" class="mode">64-bit No-boxing</div><div data-mode="32-word" class="mode">32-bit Word-boxing</div><div data-mode="32-no" class="mode">32-bit No-boxing</div></div><div class="chart-item"><div class="chart"></div><div class="legend"><div class="legend-body"><div class="legend-items"><div class="legend-item baseline"><div class="legend-figure"></div><div class="legend-label">Baseline</div></div><div class="legend-item new"><div class="legend-figure"></div><div class="legend-label">New</div></div><div class="legend-item factor"><div class="legend-figure"><div class="text up"></div><div class="text down"></div></div><div class="legend-label">Factor</div></div></div></div></div></div></div>
+<p>ハッシュテーブルなしの場合は概ね両実装とも同等の性能で、ハッシュテーブルありの場合は0.85倍前後で対応する C API の <code>mrb_hash_get</code> の性能差より小さくなっており、基本傾向の通りです。</p>
+
+<h4 id="hash-each"><code>Hash#each</code></h4>
+
+<p>サイズが <em>N</em> の <code>Hash</code> に対して全エントリーを <code>Hash#each</code> で反復した時間の計測結果です。</p>
+<div id="chart-performance-ruby-each" class="bar-chart"><div class="modes"><div data-mode="64-word" class="mode">64-bit Word-boxing</div><div data-mode="64-nan" class="mode">64-bit NaN-boxing</div><div data-mode="64-no" class="mode">64-bit No-boxing</div><div data-mode="32-word" class="mode">32-bit Word-boxing</div><div data-mode="32-no" class="mode">32-bit No-boxing</div></div><div class="chart-item"><div class="chart"></div><div class="legend"><div class="legend-body"><div class="legend-items"><div class="legend-item baseline"><div class="legend-figure"></div><div class="legend-label">Baseline</div></div><div class="legend-item new"><div class="legend-figure"></div><div class="legend-label">New</div></div><div class="legend-item factor"><div class="legend-figure"><div class="text up"></div><div class="text down"></div></div><div class="legend-label">Factor</div></div></div></div></div></div></div>
+<p>64-bit No-boxing, 32-bit Word-boxing, 32-bit No-boxing では、両実装ともほぼ同等の性能です。同等の C API である <code>mrb_hash_foreach</code> における性能差が表れていませんが、これは <code>Hash#each</code> は以下の利用によりオーバーヘッドが極めて大きいため、C API の性能差は誤差の範囲になっているためだと考えています。</p>
+
+<ul>
+<li>Ruby で実装されている。</li>
+<li><code>Hash#keys</code> と <code>Hash#values</code> の結果に対して反復している。</li>
+<li>ブロック呼び出しのコストがとても大きい。</li>
+</ul>
+
+<p>しかし、64-bit Word-boxing と 64-bit NaN-boxing では0.9倍前後になっており理由は不明です。<code>mrb_hash_foreach</code> と同様に別な環境での追試ではこのような傾向は見られなかったため、計測環境に依存する傾向だと考えていますが、直接的な原因は分かっていません。</p>
+
+<h4 id="hash-delete"><code>Hash#delete</code></h4>
+
+<p>サイズが <em>N</em> の <code>Hash</code> に対してすべてのキーと1個の存在しないキーを引数として <code>Hash#delete</code> を呼び出した際の、1回あたりの平均時間の計測結果です。</p>
+<div id="chart-performance-ruby-delete" class="bar-chart"><div class="modes"><div data-mode="64-word" class="mode">64-bit Word-boxing</div><div data-mode="64-nan" class="mode">64-bit NaN-boxing</div><div data-mode="64-no" class="mode">64-bit No-boxing</div><div data-mode="32-word" class="mode">32-bit Word-boxing</div><div data-mode="32-no" class="mode">32-bit No-boxing</div></div><div class="chart-item"><div class="chart"></div><div class="legend"><div class="legend-body"><div class="legend-items"><div class="legend-item baseline"><div class="legend-figure"></div><div class="legend-label">Baseline</div></div><div class="legend-item new"><div class="legend-figure"></div><div class="legend-label">New</div></div><div class="legend-item factor"><div class="legend-figure"><div class="text up"></div><div class="text down"></div></div><div class="legend-label">Factor</div></div></div></div></div></div></div>
+<p>Baseline 実装ではハッシュテーブルなしの場合もエントリーリストを線形探索していたため計算量は <em>O</em>(<em>N</em>) でしたが、New 実装ではハッシュテーブル探索を行うようにしたため <em>O</em>(1) となり、処理時間は概ね一定になっています。</p>
+
+<h4 id="hash-shift"><code>Hash#shift</code></h4>
+
+<p>サイズが <em>N</em> の <code>Hash</code> に対して <em>N</em> + 1 回 <code>Hash#shift</code> を呼び出した際の、1回あたりの平均時間の計測結果です。</p>
+<div id="chart-performance-ruby-shift" class="bar-chart"><div class="modes"><div data-mode="64-word" class="mode">64-bit Word-boxing</div><div data-mode="64-nan" class="mode">64-bit NaN-boxing</div><div data-mode="64-no" class="mode">64-bit No-boxing</div><div data-mode="32-word" class="mode">32-bit Word-boxing</div><div data-mode="32-no" class="mode">32-bit No-boxing</div></div><div class="chart-item"><div class="chart"></div><div class="legend"><div class="legend-body"><div class="legend-items"><div class="legend-item baseline"><div class="legend-figure"></div><div class="legend-label">Baseline</div></div><div class="legend-item new"><div class="legend-figure"></div><div class="legend-label">New</div></div><div class="legend-item factor"><div class="legend-figure"><div class="text up"></div><div class="text down"></div></div><div class="legend-label">Factor</div></div></div></div></div></div></div>
+<p><code>Hash#shift</code> で取り除かれる先頭エントリーの探索はエントリーリストの線形探索であるため、ここでの計測方法の場合は <code>Hash</code> サイズが増えると (先頭の削除済み要素が増えると) 遅くなります。そのため、性能は基本的に反復性能に依存するはずで、全体的に New 実装のほうが速めなので概ねその通りになっているように見えます。ただし、次の点は注意が必要です。</p>
+
+<ul>
+<li><code>Hash</code> サイズが増えるほど性能差が大きくなっていますが <code>mrb_hash_foreach</code> ではそのような傾向は見られません。これは、<code>Hash#shift</code> を <em>N</em> + 1 回行うと探索を繰り返し行うため性能差が累積されるためだと考えています。</li>
+<li><code>Hash</code> サイズが40の場合は New 実装のほうがやや遅い場合もありますが、これは New 実装のほうが計算量が多いためだと考えています。エントリーが削除済みかどうかを、Baseline 実装ではエントリーリストにのみ保持していましたが、New 実装ではハッシュバケットにも保持するようにしたため (ハッシュテーブル探索の際にエントリーが削除済みかどうかをエントリーリストを参照せずに判断できるため探索の効率が良い)、エントリーを取り除く際にハッシュバケットの更新も必要になっています。</li>
+</ul>
+
+<h4 id="hash-dup"><code>Hash#dup</code></h4>
+
+<p>サイズが <em>N</em> の <code>Hash</code> を <code>Hash#dup</code> で複製した時間の計測結果です。</p>
+<div id="chart-performance-ruby-dup" class="bar-chart"><div class="modes"><div data-mode="64-word" class="mode">64-bit Word-boxing</div><div data-mode="64-nan" class="mode">64-bit NaN-boxing</div><div data-mode="64-no" class="mode">64-bit No-boxing</div><div data-mode="32-word" class="mode">32-bit Word-boxing</div><div data-mode="32-no" class="mode">32-bit No-boxing</div></div><div class="chart-item"><div class="chart"></div><div class="legend"><div class="legend-body"><div class="legend-items"><div class="legend-item baseline"><div class="legend-figure"></div><div class="legend-label">Baseline</div></div><div class="legend-item new"><div class="legend-figure"></div><div class="legend-label">New</div></div><div class="legend-item factor"><div class="legend-figure"><div class="text up"></div><div class="text down"></div></div><div class="legend-label">Factor</div></div></div></div></div></div></div>
+<p><code>Hash#dup</code> は Baseline 実装では C 実装も用意されていましたが Ruby 実装が使われていたため、New 実装では C 実装を利用するようにしました (単純な <code>memcpy</code> を利用できるようになったためさらに効率的になっています)。そのため、大幅に高速化されています。</p>
+</article></body></html>

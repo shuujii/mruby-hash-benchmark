@@ -1,0 +1,42 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><title>Hash Benchmark for mruby</title><link rel="stylesheet" href="/css/main.css"><link rel="stylesheet" href="/css/uPlot.min.css"><script src="/js/uPlot.iife.min.js"></script><script src="/js/chart.js"></script></head><body><header><h1><a href="/">Hash Benchmark for mruby</a></h1><div><a href="https://github.com/shuujii/mruby-hash-benchmark">GitHub</a></div></header><nav id="toc"><ul><li><a href="/" class="h2">Environment</a><ul><li><a href="/#benchmark-code" class="h3">Benchmark Code</a></li><li><a href="/#implementation" class="h3">Implementation</a></li><li><a href="/#platform" class="h3">Platform</a><ul><li><a href="/#os" class="h4">OS</a></li><li><a href="/#hardware" class="h4">Hardware</a></li></ul></li><li><a href="/#compiler" class="h3">Compiler</a></li><li><a href="/#type-size" class="h3">Type Size</a></li></ul></li><li><a href="/points-of-improvement" class="h2">Points of Improvement</a></li><li class="active"><a href="#memory-usage" class="h2">Memory Usage</a></li><li><a href="/performance" class="h2">Performance</a><ul><li><a href="/performance#basic-operations" class="h3">Basic Operations</a><ul><li><a href="/performance#mrb_hash_set" class="h4"><code>mrb_hash_set</code></a></li><li><a href="/performance#mrb_hash_get" class="h4"><code>mrb_hash_get</code></a></li><li><a href="/performance#mrb_hash_foreach" class="h4"><code>mrb_hash_foreach</code></a></li></ul></li><li><a href="/performance#other-operations" class="h3">Other Operations</a><ul><li><a href="/performance#hash-set" class="h4"><code>Hash#[]=</code></a></li><li><a href="/performance#hash-get" class="h4"><code>Hash#[]</code></a></li><li><a href="/performance#hash-each" class="h4"><code>Hash#each</code></a></li><li><a href="/performance#hash-delete" class="h4"><code>Hash#delete</code></a></li><li><a href="/performance#hash-shift" class="h4"><code>Hash#shift</code></a></li><li><a href="/performance#hash-dup" class="h4"><code>Hash#dup</code></a></li></ul></li></ul></li><li><a href="/binary-size" class="h2">Binary Size</a></li></ul></nav><article id="content">
+<h2 id="memory-usage">Memory Usage</h2>
+
+<p><code>Hash</code> サイズごとのメモリー使用量 (<code>mrb_malloc</code> や <code>mrb_realloc</code> に実際に指定した値) の計測結果です (<code>struct RVALUE</code> のサイズは含みません)。</p>
+<div id="chart-memory-usage" class="line-chart"><div class="modes"><div data-mode="64-word" class="mode">64-bit Word-boxing</div><div data-mode="64-nan" class="mode">64-bit NaN-boxing</div><div data-mode="64-no" class="mode">64-bit No-boxing</div><div data-mode="32-word" class="mode">32-bit Word-boxing</div><div data-mode="32-no" class="mode">32-bit No-boxing</div></div><div class="chart-item"><div class="chart"></div><div class="legend"><div class="legend-header">Hash Size: --</div><div class="legend-body"><div class="legend-items"><div class="legend-item baseline"><div class="legend-figure"></div><div class="legend-label">Baseline:</div><div class="legend-value">--</div><div class="legend-unit">kB</div><div class="legend-expansions"><div class="el off"></div><div class="hb off"></div></div></div><div class="legend-item new"><div class="legend-figure"></div><div class="legend-label">New:</div><div class="legend-value">--</div><div class="legend-unit">kB</div><div class="legend-expansions"><div class="el off"></div><div class="hb off"></div></div></div><div class="legend-item factor"><div class="legend-figure"><div class="area down"></div><div class="area up"></div></div><div class="legend-label">Factor:</div><div class="legend-value">--</div><div class="legend-unit">times</div></div></div><div class="legend-items"><div class="legend-item expansion-el"><div class="legend-figure"></div><div class="legend-label">Entry List Expansion</div></div><div class="legend-item expansion-hb"><div class="legend-figure"></div><div class="legend-label">Hash Buckets Expansion</div></div></div><div class="legend-notes"><div>Drag and drop to zoom in (double-click resets)</div></div></div></div></div></div>
+<p>ハッシュバケット拡大時のメモリー使用量の増加量が、New 実装は Baseline 実装と比較してかなり少なくハッシュバケットが小さいことが良く分かります。</p>
+
+<p>boxing とハッシュテーブルの有無による関係は概ね以下のようになっています。</p>
+
+<table><thead>
+<tr>
+<th style="text-align: center">boxing</th>
+<th style="text-align: center">ハッシュテーブル</th>
+<th style="text-align: center">メモリー使用量</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: center">あり</td>
+<td style="text-align: center">なし</td>
+<td style="text-align: center">0.55倍-0.75倍</td>
+</tr>
+<tr>
+<td style="text-align: center">あり</td>
+<td style="text-align: center">あり</td>
+<td style="text-align: center">0.50倍-0.75倍</td>
+</tr>
+<tr>
+<td style="text-align: center">なし</td>
+<td style="text-align: center">なし</td>
+<td style="text-align: center">0.70倍-0.95倍</td>
+</tr>
+<tr>
+<td style="text-align: center">なし</td>
+<td style="text-align: center">あり</td>
+<td style="text-align: center">0.70倍-0.95倍</td>
+</tr>
+</tbody></table>
+
+<p>boxing ありのほうが削減率が大きくなっています。これは、今回削減対象となっているハッシュバケットや管理情報のメモリー使用量が、<code>Hash</code> オブジェクト全体のメモリー使用量に対して割合が大きいためです。</p>
+
+<p>なお、空のハッシュは <code>mrb_hash_new</code> で作成しているため、両実装とも初期メモリー使用量が0になっていますが、Baseline 実装では <code>Hash.new</code> や空のハッシュリテラルで作成した場合は0になりません。</p>
+</article></body></html>

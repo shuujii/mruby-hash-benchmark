@@ -23,6 +23,3 @@ tags
 
 /mruby
 /report/data
-/docs/*
-!/docs/css
-!/docs/js
