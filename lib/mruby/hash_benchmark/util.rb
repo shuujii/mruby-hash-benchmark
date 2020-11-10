@@ -84,7 +84,8 @@ module MRuby::HashBenchmark
       def task(rule, &block)
         raise ArgumentError, "rule error" unless rule.size == 1
         target, deps = rule.first
-        if !File.exist?(target) || Array(deps).any?{|dep| test ?<, target, dep}
+        if !File.exist?(target) ||
+           Array(deps).any?{|dep| File.mtime(dep) - File.mtime(target) > 0.2}
           block.call
         end
       end
