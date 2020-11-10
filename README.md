@@ -1,3 +1,5 @@
+## Hash Benchmark for mruby
+
 ### Install
 
 ```console
