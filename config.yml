@@ -1,7 +1,7 @@
 implementations:
   baseline:
     github: mruby/mruby
-    revision: 742117e7a3855efe98ed1ce96b5f71fa45a8f172
+    revision: 8455344bf3fd92ca00f598accfe6b3eb29ddcb0c
 #    path: ../mruby
 #    revision: master
   new:
