@@ -121,5 +121,7 @@ end
 
 desc "Start HTTP server for viewing report"
 task :server do
-  exec *%W[#{FileUtils::RUBY} -run -e httpd #{__dir__}/docs]
+  puts "Open with browser http://localhost:8080/mruby-hash-benchmark after launch"
+  puts
+  exec *%W[#{FileUtils::RUBY} -run -e httpd #{__dir__}]
 end

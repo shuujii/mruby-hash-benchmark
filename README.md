@@ -30,4 +30,4 @@ $ rake report
 $ rake server
 ```
 
-And, open with browser [http://localhost:8080](http://localhost:8080)
+And, open with browser [http://localhost:8080/mruby-hash-benchmark](http://localhost:8080/mruby-hash-benchmark)

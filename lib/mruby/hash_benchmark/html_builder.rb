@@ -43,17 +43,10 @@ module MRuby::HashBenchmark
       tag(name, id_and_class, escape: false, **attrs, &block)
     end
 
-    def doctype
-      @html << "<!DOCTYPE html>"
-    end
-
-    def h(obj)
-      CGI.escapeHTML(obj.to_s)
-    end
-
-    def to_s
-      @html
-    end
+    def doctype; @html << "<!DOCTYPE html>" end
+    def link_css(href) link(rel: "stylesheet", href: href) end
+    def h(obj) CGI.escapeHTML(obj.to_s) end
+    def to_s; @html end
 
     def method_missing(name, *args, **kws, &block)
       super unless /\A(?<tag>\w+)(?<suffix>!)?\z/ =~ name

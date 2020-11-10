@@ -501,7 +501,8 @@ function plot(category, feature, options, data, cb) {
   }
 }
 function drawChart(category, feature, mode, cb) {
-  const dataPath = "/" + joinWithoutNull([category,feature,`${mode}.json`],"/");
+  const dataPath = "/mruby-hash-benchmark/" +
+                   joinWithoutNull([category, feature, `${mode}.json`], "/");
   fetch(dataPath, {cache: "no-cache"})
     .then(res => res.json())
     .then(data => cb(data));

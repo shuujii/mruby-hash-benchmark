@@ -52,6 +52,7 @@ module MRuby::HashBenchmark
                 page.url = "/"
                 toc = Toc.new(page)
               end
+              page.url_with_base = url_with_base(page.url)
               page.html.scan(%r@^<h(\d) .*?>(.*)</h\d>@) do |l, name|
                 level = l.to_i
                 if level == 2
@@ -72,11 +73,14 @@ module MRuby::HashBenchmark
             end
             toc
           end
+
+          def url_with_base(url) "/mruby-hash-benchmark#{url}" end
         end
 
         def initialize(index_page)
           @root_page = index_page
         end
+
 
         def each(&block)
           page = @root_page
@@ -93,12 +97,12 @@ module MRuby::HashBenchmark
               head do
                 meta(charset: "utf-8")
                 title{TITLE}
-                link(rel: "stylesheet", href: "/css/main.css")
+                link_css(toc.url_with_base("/css/main.css"))
                 if page.chart?
-                  link(rel: "stylesheet", href: "/css/uPlot.min.css")
-                  script(src: "/js/uPlot.iife.min.js")
-#                  script(src: "/js/uPlot.iife.js")
-                  script(src: "/js/chart.js")
+                  link_css(toc.url_with_base("/css/uPlot.min.css"))
+                  script(src: toc.url_with_base("/js/uPlot.iife.min.js"))
+#                  script(src: toc.url_with_base("/js/uPlot.iife.js"))
+                  script(src: toc.url_with_base("/js/chart.js"))
                 end
               end
               body do
@@ -110,10 +114,11 @@ module MRuby::HashBenchmark
                   ul do
                     toc.each do |pg|
                       active = page.name == pg.name
-                      href = active ? "##{pg.anchor}" : pg.url
+                      href = active ? "##{pg.anchor}" : pg.url_with_base
                       li(active ? ".active" : "") do
                         a!(".h2", href: href){pg.name}
-                        toc.children_to_html(self, pg.children, pg.url, active)
+                        toc.children_to_html(
+                          self, pg.children, pg.url_with_base, active)
                       end
                     end
                   end
@@ -124,18 +129,20 @@ module MRuby::HashBenchmark
           end << "\n"
         end
 
-        def children_to_html(b, children, url, active)
+        def children_to_html(b, children, url_with_base, active)
           return if children.empty?
           b.ul do
             children.each do |child|
               b.li do
-                href = "#{url unless active}##{child.anchor}"
+                href = "#{url_with_base unless active}##{child.anchor}"
                 b.a!(".h#{child.level}", href: href){child.name}
-                children_to_html(b, child.children, url, active)
+                children_to_html(b, child.children, url_with_base, active)
               end
             end
           end
         end
+
+        def url_with_base(url) self.class.url_with_base(url) end
       end
 
       class TocHeader
@@ -149,7 +156,7 @@ module MRuby::HashBenchmark
 
       class Page < TocHeader
         include Util
-        attr_accessor :url, :html, :prev, :next
+        attr_accessor :url, :url_with_base, :html, :prev, :next
         def chart?; @name == "Memory Usage" || @name == "Performance" end
         def html_for!(md_path)
           html_path = md_path.sub(/\.md(\.erb)?\z/, '.html\1')
