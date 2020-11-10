@@ -1,4 +1,10 @@
-## Hash Benchmark for mruby
+# Hash Benchmark for mruby
+
+## Latest report
+
+* https://shuujii.github.io/mruby-hash-benchmark
+
+## How to execute benchmark
 
 ### Install
 

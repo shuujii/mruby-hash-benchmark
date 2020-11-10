@@ -107,7 +107,7 @@ module MRuby::HashBenchmark
               end
               body do
                 header do
-                  h1{a(href: "/"){TITLE}}
+                  h1{a(href: toc.url_with_base("/")){TITLE}}
                   div{a(href: GITHUB_URL){"GitHub"}}
                 end
                 nav("#toc") do
