@@ -1,0 +1,11 @@
+implementations:
+  baseline:
+    github: mruby/mruby
+    revision: 742117e7a3855efe98ed1ce96b5f71fa45a8f172
+#    path: ../mruby
+#    revision: master
+  new:
+    github: shuujii/mruby
+    revision: f2d8db39be487fcd710c5c5844ae47d3a6920e70
+#    path: ../mruby
+#    revision: reduce-memory-usage-of-Hash-object

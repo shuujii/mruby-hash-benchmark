@@ -1,0 +1,56 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+autoload :JSON, 'json'
+require_relative '../lib/mruby/hash_benchmark/cli'
+
+module MRuby::HashBenchmark
+  class Expansion < Cli
+    UINT16_MAX = 2**16-1
+    HEADER_PATH = "#{Util.root}/include/mruby/hash_benchmark.h"
+    DEFAULT_HASH_SIZE = File.foreach(HEADER_PATH) do |line|
+      break $1.to_i if line =~ /^\s*#\s*define\s+DEFAULT_HASH_SIZE\s+(\d+)/
+    end
+
+    option :size, ?s, argument: :PositiveInteger, default: DEFAULT_HASH_SIZE,
+      desc: "Hash size."
+
+    def run
+      expansions = IMPLEMENTATIONS.to_h{|impl| [impl,build(impl,options[:size])]}
+      json = JSON.generate(expansions)
+      write_file(data_dir("memory-usage/expansion.json"), json)
+    end
+
+  private
+
+    def build(impl, max_hash_size)
+      el_capa = el_inc = 0
+      hb_bound = 16;
+      els, hbs = {}, {}
+      (0..max_hash_size).each do |hash_size|
+        if el_capa < hash_size
+          els[hash_size] = true
+          el_capa, el_inc = expand_entry_list(impl, el_capa, el_inc)
+        end
+        if hb_bound < hash_size;
+          hbs[hash_size] = true
+          hb_bound = expand_hash_buckets(hb_bound)
+        end
+      end
+      {el: els, hb: hbs}
+    end
+
+    def expand_entry_list(impl, capa, inc)
+      inc = impl == :new ?
+        (capa == 0 ? 4 : capa == 10 ? 6 : capa * 6 / 5 + 6 - capa) :
+        (capa == 0 ? 4 : inc * 6 / 5 + 1)
+      inc = UINT16_MAX if inc > UINT16_MAX
+      capa += inc
+      [capa, inc]
+    end
+
+    def expand_hash_buckets(bound)
+      bound == 16 ? 24 : bound * 2;
+    end
+  end
+end

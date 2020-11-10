@@ -1,0 +1,177 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative '../lib/mruby/hash_benchmark/cli'
+
+module MRuby::HashBenchmark
+  class PerformanceOther < Cli
+    FEATURES = File.read(__FILE__).scan(/^ +def +run_\K.*$/)
+    DEFAULT_HASH_SIZES = [16, 40, 200, 500]
+    DEFAULT_MEASUREMENT_TIME = 1000
+    MEASUREMENT_INTERVAL = 50000
+
+    option_implementation
+    option_build_mode
+    option :feature, ?f, argument: FEATURES, required: true,
+      desc: "Target feature."
+    option :size, ?s, argument: :PositiveIntegers, default: DEFAULT_HASH_SIZES,
+      desc: "Measurement Hash sizes."
+    option :time, ?t, argument: :PositiveInteger, default: DEFAULT_MEASUREMENT_TIME,
+      desc: "Measurement time (milliseconds)."
+
+    def run
+      options[:size].sort!
+      send("run_#{options[:feature]}")
+    end
+
+  private
+
+    def run_set
+      execute(
+        before_hash_size:
+          "hashes = (1..#{MEASUREMENT_INTERVAL}.div(hash_size)).map{{}}",
+        before_benchmark:
+          each_array_code(:hashes, :hash, "hash.clear"),
+        count:
+          "hashes.size",
+        benchmark:
+          each_array_code(:hashes, :hash) do
+            upto_code(1, :hash_size, :v, "hash[v] = true")
+          end
+      )
+    end
+
+    def run_get
+      execute(
+        before_hash_size: <<-EOS,
+          loop_count = #{MEASUREMENT_INTERVAL}.div(hash_size+1)
+          hash = {}
+          #{upto_code(1, :hash_size, :v, "hash[v] = true")}
+        EOS
+        count:
+          "loop_count * (hash_size+1)",
+        benchmark:
+          upto_code(1, :loop_count, :_) do
+            upto_code(0, "hash_size", :n, "hash[n]")
+          end
+      )
+    end
+
+    def run_each
+      execute(
+        before_hash_size: <<-EOS,
+          loop_count = #{MEASUREMENT_INTERVAL}.div(hash_size)
+          hash = HashBenchmark.new_hashes(1, hash_size)[0]
+        EOS
+        count:
+          :loop_count,
+        benchmark:
+          upto_code(1, :loop_count, :_, "hash.each{}")
+      )
+    end
+
+    def run_delete
+      execute(
+        before_hash_size:
+          "loop_count = #{MEASUREMENT_INTERVAL}.div(hash_size+1)",
+        before_benchmark: <<-EOS,
+           hashes = HashBenchmark.new_hashes(loop_count, hash_size)
+        EOS
+        count:
+          "loop_count * (hash_size+1)",
+        benchmark:
+          each_array_code(:hashes, :hash) do
+            upto_code(0, "hash_size", :v, "hash.delete(v)")
+          end
+      )
+    end
+
+    def run_shift
+      execute(
+        before_hash_size:
+          "loop_count = #{MEASUREMENT_INTERVAL}.div(hash_size)",
+        before_benchmark: <<-EOS,
+           hashes = HashBenchmark.new_hashes(loop_count, hash_size)
+        EOS
+        count:
+          "loop_count * hash_size",
+        benchmark:
+          each_array_code(:hashes, :hash) do
+            upto_code(0, "hash_size", :v, "hash.shift")
+          end
+      )
+    end
+
+    def run_dup
+      execute(
+        before_hash_size: <<-EOS,
+          loop_count = #{MEASUREMENT_INTERVAL}.div(hash_size)
+          hash = HashBenchmark.new_hashes(1, hash_size)[0]
+        EOS
+        count:
+          :loop_count,
+        benchmark:
+          upto_code(1, :loop_count, :_, "hash.dup")
+      )
+    end
+
+    def execute(count:, benchmark:,
+                before_all: nil, before_hash_size: nil, before_benchmark: nil,
+                after_benchmark: nil, after_hash_size: nil, after_all: nil)
+      measurement_time = options[:time] * 1000
+      mruby <<-EOS
+        hash_sizes = #{options[:size]}
+        results = []
+        #{before_all}
+        HashBenchmark.disable_gc
+        #{each_array_code :hash_sizes, :hash_size, %{
+          total_count = elapsed_time = 0
+          #{before_hash_size}
+          while elapsed_time < #{measurement_time}
+            #{before_benchmark}
+            t = HashBenchmark.time
+            #{benchmark}
+            elapsed_time += HashBenchmark.time - t
+            total_count += #{count}
+            #{after_benchmark}
+            HashBenchmark.disable_gc
+          end
+          #{after_hash_size}
+          elapsed_sec = elapsed_time/1e6
+          results << [hash_size, total_count/elapsed_sec, total_count, elapsed_sec]
+#          HashBenchmark.print_heap_page_info
+        }}
+        #{after_all}
+        puts ["# hash size", "i/s", "iterations", "seconds"].join("\t")
+        #{each_array_code :results, :result, 'puts result.join("\t")'}
+      EOS
+    end
+
+    def each_array_code(ary_var, el_var, code=nil, &block)
+      idx_var = "_#{ary_var}_idx"
+      upto_code 0, "#{ary_var}.size-1", idx_var, <<-EOS
+        #{el_var} = #{ary_var}[#{idx_var}]
+        #{code || block.call}
+      EOS
+    end
+
+    def upto_code(start_expr, end_expr, idx_var, code=nil, &block)
+      end_var = "_#{idx_var}_end"
+      <<-EOS
+        #{idx_var} = #{start_expr}
+        #{end_var} = #{end_expr}
+        while #{idx_var} <= #{end_var}
+          #{code || block.call}
+          #{idx_var} += 1
+        end
+      EOS
+    end
+
+    def mruby(code)
+      impl, mode, feature = options.values_at(:impl, :mode, :feature)
+      out = capture("#{build_dir(impl, mode)}/bin/mruby", "-e", code)
+      out_path = data_dir("performance", "ruby-#{feature}/#{impl}/#{mode}.tsv")
+      write_file(out_path, out)
+    end
+  end
+end
