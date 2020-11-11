@@ -25,7 +25,7 @@ module MRuby::HashBenchmark
         mkdir_p build_dir
         rm_rf build_dir_link
         mv build_dir, build_dir_link if File.exist?(build_dir)
-        sh "rake", "-f", "#{src_dir}/Rakefile", *ARGV
+        sh "rake", "-f", "#{src_dir}/Rakefile", "-m", *ARGV
       ensure
         mv build_dir_link, build_dir if File.exist?(build_dir_link)
       end
