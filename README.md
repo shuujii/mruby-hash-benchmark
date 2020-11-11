@@ -1,8 +1,8 @@
 # Hash Benchmark for mruby
 
-## Latest report
+## Current report
 
-* https://shuujii.github.io/mruby-hash-benchmark
+[Current report](https://shuujii.github.io/mruby-hash-benchmark) is as of the time of [*Reduce memory usage of Hash object (#5121)*](https://github.com/mruby/mruby/pull/5121) pull request to mruby (the pull request has already been merged).
 
 ## How to execute benchmark
 
