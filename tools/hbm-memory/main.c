@@ -3,7 +3,6 @@
 #include <mruby.h>
 #include <mruby/hash.h>
 #include <mruby/hash_benchmark.h>
-#include "memory.h"
 
 #define ALLOC_OFFSET 8
 
