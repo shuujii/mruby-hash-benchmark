@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-
 require_relative 'chart_helper'
 
 module MRuby::HashBenchmark
