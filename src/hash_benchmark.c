@@ -129,6 +129,7 @@ mrb_hbm_new_hashes(mrb_state *mrb, mrb_int n_hash, mrb_int hash_size)
     }
     mrb_gc_arena_restore(mrb, ai);
   }
+  ARY_SET_LEN(mrb_ary_ptr(hash_ary), n_hash);
   return hash_ary;
 }
 
